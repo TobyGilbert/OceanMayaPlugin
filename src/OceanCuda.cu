@@ -11,11 +11,10 @@ void fillGpuArray(float* array, int count) {
 // ----------------------------------------------------------------------------------------------------------------------------------------
 /// @author Toby Gilbert
 // ----------------------------------------------------------------------------------------------------------------------------------------
+#include "OceanCuda.h"
 #include <helper_cuda.h>
 #include <cufft.h>
-#include "OceanCuda.h"
 #include <glm/glm.hpp>
-#include <thrust/complex.h>
 #include <curand.h>
 #include <helper_cuda_gl.h>
 #include <helper_functions.h>
@@ -35,8 +34,8 @@ __global__ void frequencyDomain(float2* d_h0Pointer, float2* d_htPointer, float 
 
     // A 2D vector to represent a position on the grid with constraits -(_res/2) <= k < (_res/2)
     glm::vec2 k;
-    k.x = float((threadIdx.x - (_res * floor(double(threadIdx.x / _res)))) - (_res/2.0));
-    k.y = float(((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res))) - (_res/2.0));
+    k.x = float((threadIdx.x - (_res * floor(double(threadIdx.x / _res)))) - (_res/2.0f));
+    k.y = float(((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res))) - (_res/2.0f));
     float kLen = sqrt(double(k.x*k.x + k.y*k.y));
 
     // Calculate the wave frequency
@@ -109,31 +108,12 @@ __global__ void height(glm::vec3* d_position, cudaSurfaceObject_t _surface, floa
 /// @param d_zDisplacement An OpenGL buffer to store the z displacement in the frequency domain
 /// @param _res The resolution of the grid
 // ----------------------------------------------------------------------------------------------------------------------------------------
-__global__ void choppiness(float2* d_ht, int _res){
-    // k - A position on the grid
-    float2 k;
-    k.x = float((threadIdx.x - (_res * floor(double(threadIdx.x / _res)))) - (_res/2.0));
-    k.y = float(((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res))) - (_res/2.0));
-    float kLen = sqrt(double(k.x*k.x + k.y*k.y));
-    float2 prev = d_ht[(blockIdx.x * blockDim.x) + threadIdx.x];
-
-    float Kx = k.x / kLen;
-    float Kz = k.y / kLen;
-    if (kLen == 0.0){
-        Kx = 0.0;
-        Kz = 0.0;
-    }
-    d_ht[(blockIdx.x * blockDim.x) + threadIdx.x].x = prev.x * -Kx;
-}
-
-__global__ void choppinessX(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
+__global__ void choppiness(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
     // A vertex on the grid
     int u = int(threadIdx.x - (_res * floor(double(threadIdx.x / _res))));
     int v = int((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res)));
 
     float2 k;
-//    k.x = float((threadIdx.x - (_res * floor(double(threadIdx.x / _res)))) - (_res/2.0));
-//    k.y = float(((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res))) - (_res/2.0));
     k.x = _windSpeed.x;
     k.y = _windSpeed.y;
 
@@ -147,11 +127,9 @@ __global__ void choppinessX(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ,
         Kz = 0.0;
     }
 
-    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0) * -Kx;
-    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0) * -Kz;
-
+    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0f) * -Kx;
+    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0f) * -Kz;
 }
-
 // ----------------------------------------------------------------------------------------------------------------------------------------
 void updateFrequencyDomain(float2* d_h0, float2* d_ht, float _time, int _res){
     int numBlocks =( _res * _res )/ 1024;
@@ -159,16 +137,12 @@ void updateFrequencyDomain(float2* d_h0, float2* d_ht, float _time, int _res){
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------
 void updateHeight(glm::vec3* d_position, cudaSurfaceObject_t _surface, float2* d_height, float2 *d_xDisplacement, float _choppiness, int _res, float _scale){
-
-    // Bind the cudaArray to a globally scoped CUDA surface
-//    cudaBindSurfaceToArray(_surface, d_heightsCudaArray);
-
     int numBlocks =( _res * _res )/ 1024;
     height<<<numBlocks, 1024>>>(d_position, _surface, d_height, d_xDisplacement, _choppiness,  _res, _scale);
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------
 void addChoppiness(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
     int numBlocks =( _res * _res )/ 1024;
-    choppinessX<<<numBlocks, 1024>>>(d_Heights, d_ChopX, d_ChopZ, _res, _windSpeed);
+    choppiness<<<numBlocks, 1024>>>(d_Heights, d_ChopX, d_ChopZ, _res, _windSpeed);
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------

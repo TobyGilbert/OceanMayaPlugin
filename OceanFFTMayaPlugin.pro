@@ -26,7 +26,8 @@ SOURCES+=src/Plugin.cpp \
 SOURCES-=src/OceanCuda.cu
 HEADERS+=include/OceanNode.h \
          include/OceanCuda.h \
-         include/Ocean.h
+         include/Ocean.h \
+         include/mathsUtils.h
 
 OBJECTS_DIR = obj
 INCLUDEPATH+=./include
@@ -78,7 +79,7 @@ linux-g++*:TEMPLATE = lib
 ####################################################################################
 # this tells qmake where maya is
 ####################################################################################
-linux-g++*:MAYALOCATION=/opt/autodesk/maya/
+linux-g++*:MAYALOCATION=/opt/autodesk/maya
 ####################################################################################
 # under linux we need to use the version of g++ used to build maya
 # in this case g++412
@@ -98,11 +99,16 @@ linux-g++*:LIBS += -L$$MAYALOCATION/lib \
 # tell maya we're building for linux
 ####################################################################################
 linux:DEFINES+=linux
+linux:DEFINES+=LINUX
+####################################################################################
+# linux flags
+####################################################################################
+linux*:QMAKE_CXX += -fPIC
 ####################################################################################
 # tell maya we're building for Mac
 ####################################################################################
 macx:DEFINES+=OSMac_
-macx:MAYALOCATION=/Applications/Autodesk/maya2015
+macx:MAYALOCATION=/Applications/Autodesk/maya2014
 macx:CONFIG -= app_bundle
 macx:INCLUDEPATH+=$$MAYALOCATION/devkit/include
 ####################################################################################
@@ -112,9 +118,12 @@ macx:INCLUDEPATH+=$$MAYALOCATION/devkit/include
 ####################################################################################
 # path to cuda directory
 macx:CUDA_DIR = /Developer/NVIDIA/CUDA-6.5
+linux:CUDA_DIR = /opt/cuda-6.5
 
 macx:LIBS +=-bundle
-macx:LIBS += -L$$CUDA_DIR/lib -lcudart
+macx:LIBS += -L$$CUDA_DIR/lib -lcuda -lcudart -lcufft
+linux:LIBS += -L$$CUDA_DIR/lib64 -lcuda -lcudart -lcufft
+
 macx:LIBS -=-dynamiclib
 ####################################################################################
 
@@ -128,7 +137,7 @@ PROJECT_DIR = $$system(pwd)
 macx:DEFINES += DARWIN
 
 # CUDA
-NVCCFLAGS = --compiler-options -fno-strict-aliasing -use_fast_math --ptxas-options=-v
+NVCCFLAGS = --compiler-options -fno-strict-aliasing -use_fast_math --ptxas-options=-v -Xcompiler -fPIC
 
 INCLUDEPATH += /usr/local/include
 INCLUDEPATH +=./include /opt/local/include
@@ -138,12 +147,11 @@ INCLUDEPATH += $$CUDA_DIR/../shared/inc
 
 DESTDIR=./
 
-linux::CUDA_LIBS += -L$$CUDA_DIR/lib64
+linux:CUDA_LIBS += -L$$CUDA_DIR/lib64
 CUDA_LIBS += -L$$CUDA_DIR/lib
 CUDA_LIBS += -L$$CUDA_DIR/samples/common/lib
 CUDA_LIBS += -L/opt/local/lib
-CUDA_LIBS += -lcudart -lcufftw -lcufft
-LIBS += -lcufft
+CUDA_LIBS += -lcudart  -lcufft
 
 CUDA_SOURCES =src/OceanCuda.cu
 
@@ -153,7 +161,7 @@ CUDA_INC = $$join(INCLUDEPATH,' -I','-I',' ')
 cuda.input = CUDA_SOURCES
 cuda.output = ${OBJECTS_DIR}${QMAKE_FILE_BASE}_cuda.o
 
-cuda.commands = $$CUDA_DIR/bin/nvcc -m64 -g -G -gencode arch=compute_30,code=sm_30 -c $$NVCCFLAGS $$CUDA_INC $$CUDA_LIBS  ${QMAKE_FILE_NAME} -o ${QMAKE_FILE_OUT}
+cuda.commands = $$CUDA_DIR/bin/nvcc -m64 -g -G -gencode arch=compute_20,code=sm_20 -c $$NVCCFLAGS $$CUDA_INC $$CUDA_LIBS  ${QMAKE_FILE_NAME} -o ${QMAKE_FILE_OUT}
 
 cuda.dependency_type = TYPE_C
 cuda.depend_command = $$CUDA_DIR/bin/nvcc -g -G -M $$CUDA_INC $$NVCCFLAGS ${QMAKE_FILE_NAME}

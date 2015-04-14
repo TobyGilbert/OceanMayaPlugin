@@ -1,0 +1,95 @@
+/*********************************************************************NVMH3****
+Path:  NVSDK\Common\media\cgfx1.4
+File:  $Id: //sw/devtools/FXComposer2/Alpha4+/SDK/MEDIA/CgFX1.4/BareBones.cgfx#1 $
+
+Copyright NVIDIA Corporation 2003
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THIS SOFTWARE IS PROVIDED
+*AS IS* AND NVIDIA AND ITS SUPPLIERS DISCLAIM ALL WARRANTIES, EITHER EXPRESS
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE.  IN NO EVENT SHALL NVIDIA OR ITS SUPPLIERS
+BE LIABLE FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR CONSEQUENTIAL DAMAGES
+WHATSOEVER (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS,
+BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR ANY OTHER PECUNIARY LOSS)
+ARISING OUT OF THE USE OF OR INABILITY TO USE THIS SOFTWARE, EVEN IF NVIDIA HAS
+BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+Comments:
+	Just Show Geometry
+	$Date: 2006/04/10 $
+	$Revision: #1 $
+
+******************************************************************************/
+
+// string Category = "Effects\\Cg\\BRDF";
+// string keywords = "texture";
+string description = "Bare-Bones";
+
+// tweakables //////////////////////////////////////////
+
+float3 BaseColor : Ambient
+<
+	string UIHelp = "Base Color";
+> = {1.0f, 1.0f, 1.0f};
+
+// untweakables //////////////////////////////////////////
+
+float4x4 WorldViewProjXf : WorldViewProjection;
+
+/****************************************************/
+/********** CG SHADER FUNCTIONS *********************/
+/****************************************************/
+
+/**************************************/
+/***** SHARED STRUCT ******************/
+/**** Data from app vertex buffer *****/
+/****     for all passes          *****/
+/**************************************/
+
+struct appdata {
+    float3 Position	: POSITION;
+	float3 Normal : NORMAL;
+};
+
+/*****************************************************/
+/*** values passed from vertex shader to fragments ***/
+/*****************************************************/
+
+// vertex->fragment registers used for this pass only
+struct outVertexData {
+    float4 HPosition	: POSITION;
+	float4 Colour;
+};
+
+/****************************************/
+/****************************************/
+
+outVertexData bareVS(appdata IN)
+{
+	outVertexData OUT;
+	float4 Po = float4(IN.Position.xyz,1.0);	
+	OUT.HPosition = mul(WorldViewProjXf, Po);
+	OUT.Colour = float4(IN.Normal, 1.0);
+	return OUT;
+}
+
+float4 bareFS(outVertexData IN)	: COLOR
+{
+	//return float4(BaseColor.xyz,1.0f);
+	return IN.Colour;
+}
+
+/****************************************************/
+/********** TECHNIQUES ******************************/
+/****************************************************/
+
+technique main {
+	pass p0 {
+		VertexProgram = compile arbvp1 bareVS();
+		DepthTestEnable = true;
+		DepthMask = true;
+		CullFaceEnable = false;
+		FragmentProgram = compile arbfp1 bareFS();
+	}
+}
+
+/***************************** eof ***/

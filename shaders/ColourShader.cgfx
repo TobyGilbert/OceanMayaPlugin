@@ -1,0 +1,151 @@
+// string Category = "Effects\\Cg\\BRDF";
+// string keywords = "texture";
+string description = "ColourShader";
+
+// tweakables //////////////////////////////////////////
+float4 cameraPosition : Position
+<
+	string UIHelp = "Camera";
+	string Space = "World";
+> = { 0.0, 100.0, 100.0, 1.0};
+
+float4 sunPosition : Position
+<
+	string UIHelp = "Sun";
+	string Space = "World";
+> = { 0.0, 20.0, -500.0, 1.0};
+
+float3 seaBaseColour : Ambient
+<
+	string UIHelp = "Sea Base Colour";
+> = { 0.1f, 0.19f, 0.22f };
+
+float3 seaTopColour : Ambient
+<
+	string UIHelp = "Sea Top Colour";
+> = { 0.8f, 0.9f, 0.6f };
+///////////
+
+
+texture gEnvTexture : ENVIRONMENT <
+	string UIHelp = "Environment Map";
+    string ResourceName = "../cubemaps/BrightSky.dds";
+    string UIName =  "Environment";
+    string ResourceType = "Cube";
+>;
+
+samplerCUBE Environment = sampler_state {
+    Texture = <gEnvTexture>;
+    MinFilter = LinearMipMapLinear;
+    MagFilter = Linear;
+    WrapS = ClampToEdge;
+    WrapT = ClampToEdge;
+    WrapR = ClampToEdge;
+};
+
+// untweakables //////////////////////////////////////////
+
+float4x4 ModelViewProjectionMatrix : WorldViewProjection;
+float4x4 ModelViewMatrix : WorldView;
+float4x4 NormalMatrix : WorldViewInverseTranspose;
+
+/****************************************************/
+/********** CG SHADER FUNCTIONS *********************/
+/****************************************************/
+
+/**************************************/
+/***** SHARED STRUCT ******************/
+/**** Data from app vertex buffer *****/
+/****     for all passes          *****/
+/**************************************/
+
+struct vertData {
+    float3 Position	: POSITION;
+	float3 Normal 	: NORMAL;
+};
+
+/*****************************************************/
+/*** values passed from vertex shader to fragments ***/
+/*****************************************************/
+
+// vertex->fragment registers used for this pass only
+struct fragData {
+    float4 HPosition 	: POSITION;
+	float4 Colour 		: COLOR0;
+	float4 ViewVector	: TEXCOORD0;
+	float3 Normal 		: TEXCOORD1;
+	float4 Pos 			: TEXCOORD2;
+};
+
+/****************************************/
+/****************************************/
+
+fragData vert(vertData IN){
+	fragData OUT;
+	float4 position = float4(IN.Position.xyz,1.0);
+	
+	OUT.HPosition = mul(ModelViewProjectionMatrix, position);
+	OUT.Colour = mul(NormalMatrix, float4(IN.Normal + float3(0.5), 1.0));
+	OUT.Pos = mul(ModelViewMatrix, float4(position.xyz, 1.0));
+	OUT.ViewVector = normalize(OUT.Pos - cameraPosition);
+	OUT.Normal = normalize(mul(NormalMatrix, float4(IN.Normal, 1.0))).xyz;	
+
+	return OUT;
+}
+
+float fresnel(float3 _normal, float4 _viewVector){
+	float f = 1.0 - max(dot(_normal, -_viewVector.xyz), 0.0);
+	f = pow(f, 2.0) * 0.65;
+	return f;
+}
+
+float diffuse(float4 _pos, float3 _normal){
+	float3 s = normalize(sunPosition.xyz - _pos.xyz);
+	return max(dot(s, _normal), 0.0);
+}
+
+// Sun streak referenced from https://www.shadertoy.com/view/4dl3zr
+float3 sunStreak(float3 _normal, float4 _position){
+	float3 r = normalize(reflect(mul(float3x3(NormalMatrix),-sunPosition.xyz), _normal));
+	return float3(1.0 * pow(max(0.0, dot(r.xyz, normalize(-_position.xyz))), 200.0));
+}
+
+float4 frag(fragData IN) : COLOR
+{
+	float3 Normal = normalize(IN.Normal);
+	//float3 seaBaseColour = float3(0.1, 0.19, 0.22);
+	//float3 seaTopColour = float3(0.8, 0.9, 0.6);
+
+	// Calculate the reflected colour
+	float4 reflectionVector = normalize(reflect(IN.ViewVector, float4(Normal,1.0)));
+	float3 reflectionColour = texCUBE(Environment,reflectionVector).xyz;
+	//float3 reflectionColour = float3(1.0, 1.0, 1.0);
+	
+	// The refraction colour
+	float3 refractionColour = seaBaseColour + float3(diffuse(IN.Pos, Normal)) * seaTopColour * 0.12;
+
+	// Mix the reflected colour with the refracted colour
+	float3 colour = mix(refractionColour, reflectionColour, fresnel(Normal, IN.ViewVector));
+	float3 dist = IN.Pos.xyz - cameraPosition.xyz;
+	float attenuation = max(1.0 - dot(dist, dist) * 0.001, 0.0);
+	colour += seaTopColour * (IN.Pos.z - 0.6) * 0.18 * attenuation;
+	colour += sunStreak(Normal, IN.Pos);
+
+	return float4(colour, 1.0);
+}
+
+/****************************************************/
+/********** TECHNIQUES ******************************/
+/****************************************************/
+
+technique main {
+	pass p0 {
+		VertexProgram = compile arbvp1 vert();
+		DepthTestEnable = true;
+		DepthMask = true;
+		CullFaceEnable = false;
+		FragmentProgram = compile arbfp1 frag();
+	}
+}
+
+/***************************** eof ***/

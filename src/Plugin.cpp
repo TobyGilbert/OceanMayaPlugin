@@ -6,7 +6,7 @@
 MStatus initializePlugin( MObject obj )
 {
     MStatus   status;
-    MFnPlugin plugin( obj, "", "Toby Gilbert" , "2015" );
+    MFnPlugin plugin( obj, "", "Toby Gilbert" , "Any" );
 
   // register our nodes and the commands which will be called
     status = plugin.registerNode( "oceanNode", OceanNode::m_id, &OceanNode::creator, &OceanNode::initialize, MPxNode::kDependNode );
