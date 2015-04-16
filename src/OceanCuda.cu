@@ -1,15 +1,3 @@
-#include "OceanCuda.h"
-
-__global__ void fillKernel(float* array) {
-    array[threadIdx.x] = threadIdx.x * 0.5;
-}
-
-void fillGpuArray(float* array, int count) {
-    fillKernel<<<1, count>>>(array);
-}
-
-// ----------------------------------------------------------------------------------------------------------------------------------------
-/// @author Toby Gilbert
 // ----------------------------------------------------------------------------------------------------------------------------------------
 #include "OceanCuda.h"
 #include <helper_cuda.h>
@@ -23,17 +11,17 @@ void fillGpuArray(float* array, int count) {
 #include <surface_functions.h>
 // ----------------------------------------------------------------------------------------------------------------------------------------
 /// @brief Given a time you can create a field of frequency amplitudes
-/// @param d_h0Pointer An OpenGL buffer which stores a set of amplitudes and phases at time zero
-/// @param d_htPointer An OpenGL buffer for outputting the frequency amplitude field
-/// @param _time The current simulation time
-/// @param _res The simulation resolution
+/// @param d_h0Pointer an array of points in the frequency domain at time zero
+/// @param d_htPointer an array used to output the points in the frequency domain at time _time
+/// @param _time the current simulation time
+/// @param _res the simulation resolution
 // ----------------------------------------------------------------------------------------------------------------------------------------
 __global__ void frequencyDomain(float2* d_h0Pointer, float2* d_htPointer, float _time, int _res){
     // A constant for the accelleration due to gravity
     const float g = 9.81;
 
     // A 2D vector to represent a position on the grid with constraits -(_res/2) <= k < (_res/2)
-    glm::vec2 k;
+    float2 k;
     k.x = float((threadIdx.x - (_res * floor(double(threadIdx.x / _res)))) - (_res/2.0f));
     k.y = float(((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res))) - (_res/2.0f));
     float kLen = sqrt(double(k.x*k.x + k.y*k.y));
@@ -65,50 +53,24 @@ __global__ void frequencyDomain(float2* d_h0Pointer, float2* d_htPointer, float 
 
     float2 hStar;
     hStar.x = (h0conjugate.x * complexExpConjugate.x - h0conjugate.y * complexExpConjugate.y) ;
-    hStar.y = (h0conjugate.x * complexExpConjugate.x - h0conjugate.y * complexExpConjugate.y) ;
+    hStar.y = (h0conjugate.x * complexExpConjugate.x + h0conjugate.y * complexExpConjugate.y) ;
 
     // Output h(k,t) term to d_htPointer buffer which represents a set of points in the frequency domain
     float2 hTilde;
     hTilde.x = h.x + hStar.x;
     hTilde.y = h.y + hStar.y;
-    d_htPointer[(blockIdx.x * blockDim.x) + threadIdx.x].x = hTilde.x;
-    d_htPointer[(blockIdx.x * blockDim.x) + threadIdx.x].y = hTilde.y;
-}
-// ----------------------------------------------------------------------------------------------------------------------------------------
-/// @brief Once inverse FFT has been performed points in the frequency domain are converted to the spatial domain
-/// and can be used to update the heights
-/// @param d_position An OpenGL buffer for storing the current positions of the vertices in the grid
-/// @param d_height An OpenGL buffer which holds the new heights of grid positions
-/// @param d_normal An OpenGL buffer which holds the normals
-/// @param d_xDisplacement An OpenGL buffer for storing the displacment in the x axis
-/// @param _res The resolution of the grid
-/// @param _scale Scales the amplitude of the waves
-// ----------------------------------------------------------------------------------------------------------------------------------------
-__global__ void height(glm::vec3* d_position, cudaSurfaceObject_t _surface, float2* d_height, float2* d_xDisplacement, float _choppiness, int _res, float _scale){
-    // A vertex on the grid
-    int u = int(threadIdx.x - (_res * floor(double(threadIdx.x / _res))));
-    int v = int((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res)));
 
-
-    // Sign correction - Unsure why this is needed
-    float sign = 1.0;
-    if ((u+v) % 2 != 0){
-        sign = -1.0;
-    }
-    // Update the heights of the vertices and add x and z displacement
-    d_position[(blockIdx.x * blockDim.x) + threadIdx.x].y = (d_height[(blockIdx.x * blockDim.x) + threadIdx.x].x / _scale) * sign ;
-    // Write the heights to a texture so it can be used in the shader
-//    surf2Dwrite(make_uchar4((d_height[(blockIdx.x * blockDim.x) + threadIdx.x].x / _scale) * sign + 100.0, 0, 0, 255), _surface, (int)sizeof(uchar4)*u, v, cudaBoundaryModeZero);
-    d_position[(blockIdx.x * blockDim.x) + threadIdx.x].x += (d_xDisplacement[(blockIdx.x * blockDim.x) + threadIdx.x].x / _scale) * _choppiness * sign;
+    d_htPointer[(blockIdx.x * blockDim.x) + threadIdx.x] = hTilde;
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------
 /// @brief Create x displacement in in the frequency domain
-/// @param
-/// @param d_xDisplacement An OpenGL buffer to store the x displacement in the frequency domain
-/// @param d_zDisplacement An OpenGL buffer to store the z displacement in the frequency domain
-/// @param _res The resolution of the grid
+/// @param d_Ht  array of points in the frequnecy domain used for generating heights
+/// @param d_ChopX used for outputing displacement in the x axis in the frequency domain
+/// @param d_ChopZ used for outputing displacement in the z axis in the frequency domain
+/// @param _res the resolution of the ocean grid
+/// @param _windSpeed the velocity of the wind
 // ----------------------------------------------------------------------------------------------------------------------------------------
-__global__ void choppiness(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
+__global__ void choppiness(float2* d_Ht, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
     // A vertex on the grid
     int u = int(threadIdx.x - (_res * floor(double(threadIdx.x / _res))));
     int v = int((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res)));
@@ -127,22 +89,20 @@ __global__ void choppiness(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, 
         Kz = 0.0;
     }
 
-    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0f) * -Kx;
-    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = (d_Heights[(blockIdx.x * blockDim.x) + threadIdx.x].x / 50000.0f) * -Kz;
+    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].x * 0.0;
+    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].y = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].y * -Kx;
+
+    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].x * 0.0;
+    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].y = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].y * -Kz;
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------
-void updateFrequencyDomain(float2* d_h0, float2* d_ht, float _time, int _res){
+void updateFrequencyDomain(float2* d_H0,  float2* d_Ht, float _time, int _res){
     int numBlocks =( _res * _res )/ 1024;
-    frequencyDomain<<<numBlocks, 1024>>>(d_h0, d_ht, _time, _res);
+    frequencyDomain<<<numBlocks, 1024>>>(d_H0, d_Ht, _time, _res);
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------
-void updateHeight(glm::vec3* d_position, cudaSurfaceObject_t _surface, float2* d_height, float2 *d_xDisplacement, float _choppiness, int _res, float _scale){
+void addChoppiness(float2* d_Ht, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
     int numBlocks =( _res * _res )/ 1024;
-    height<<<numBlocks, 1024>>>(d_position, _surface, d_height, d_xDisplacement, _choppiness,  _res, _scale);
-}
-// ----------------------------------------------------------------------------------------------------------------------------------------
-void addChoppiness(float2* d_Heights, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
-    int numBlocks =( _res * _res )/ 1024;
-    choppiness<<<numBlocks, 1024>>>(d_Heights, d_ChopX, d_ChopZ, _res, _windSpeed);
+    choppiness<<<numBlocks, 1024>>>(d_Ht, d_ChopX, d_ChopZ, _res, _windSpeed);
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------

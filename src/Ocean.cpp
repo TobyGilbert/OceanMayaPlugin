@@ -10,8 +10,9 @@
 Ocean::Ocean(){
     m_resolution = 128;
     m_gridSize = m_resolution * m_resolution;
-    m_windDirection = make_float2(0.5, 0.5);
-    m_A = 0.01;
+    m_frequency = 0.5;
+    m_windDirection = make_float2(0.0, 0.5);
+    m_A = 100.0;
     m_windSpeed = 100.0;
     m_L = (m_windSpeed* m_windSpeed) / 9.81;
     m_l = 1.0 / (float)m_L;
@@ -36,10 +37,11 @@ float Ocean::phillips(float2 _k){
     ph *= m_A;
 
     // | k . w |^2
-    float kw = (normalise(_k).x * normalise(m_windDirection).x + normalise(_k).y * normalise(m_windDirection).y);
+    float kw =  dot(normalise(_k), normalise(m_windDirection));
     ph *= kw * kw;
 
-    if (kw < 0.0){
+    // Waves moving in the opposite direction to the wind get dampened
+    if (((_k.x * m_windDirection.x) + (_k.y * m_windDirection.y))  < 0.0){
         ph *= 0.05;
     }
     // exp(-k^2 l^2)
@@ -70,33 +72,21 @@ void Ocean::createH0(){
             int m = x - (m_resolution/2.0);
             int n = y - (m_resolution/2.0);
             float2 k;
-            k.x = (M_2_PI * m) / 2000.0; //m_L;
-            k.y = (M_2_PI * n) / 2000.0; //m_L;
+            k.x = (2*M_PI * m) / 1000.0;
+            k.y = (2*M_PI * n) / 1000.0;
+
             float2 h;
+            h.x = (1.0/sqrt(2.0)) * gauss() * sqrt(phillips(k));
+            h.y = (1.0/sqrt(2.0)) * gauss() * sqrt(phillips(k));
 
-            h.x = (1.0/sqrt(2.0)) * gauss();
-            if (k.x == 0 && k.y == 0){
-                h.x = 0.0;
-            }
-            else{
-                h.x *= sqrt(phillips(k));
-            }
-
-            h.y = (1.0/sqrt(2.0)) * gauss();
-            if (k.x ==0 && k.y == 0){
-                h.y = 0.0;
-            }
-            else{
-                h.y *= sqrt(phillips(k));
-            }
             h_H0[(y + (x * m_resolution))] = h;
+
         }
     }
     checkCudaErrors(cudaMemcpy(d_H0, h_H0, m_gridSize*sizeof(float2), cudaMemcpyHostToDevice));
 }
 //----------------------------------------------------------------------------------------------------------------------
 void Ocean::initialise(){
-
     // Assign memory for the frequecy field and heights in the time domain
     h_H0 = (float2*) malloc(m_gridSize*sizeof(float2));
     checkCudaErrors(cudaMalloc((void**)&d_H0, m_gridSize*sizeof(float2)));
@@ -106,9 +96,8 @@ void Ocean::initialise(){
     checkCudaErrors(cudaMalloc((void**)&d_Heights, m_gridSize*sizeof(float2)));
     h_ChopX = (float2*)malloc(m_gridSize*sizeof(float2));
     checkCudaErrors(cudaMalloc((void**)&d_ChopX, m_gridSize*sizeof(float2)));
-    h_ChopY = (float2*)malloc(m_gridSize*sizeof(float2));
-    checkCudaErrors(cudaMalloc((void**)&d_ChopY, m_gridSize*sizeof(float2)));
-
+    h_ChopZ = (float2*)malloc(m_gridSize*sizeof(float2));
+    checkCudaErrors(cudaMalloc((void**)&d_ChopZ, m_gridSize*sizeof(float2)));
 
     // Create our frequency domain at time zero
     createH0();
@@ -122,18 +111,19 @@ void Ocean::initialise(){
 }
 //----------------------------------------------------------------------------------------------------------------------
 void Ocean::update(double _time){
-    updateFrequencyDomain(d_H0, d_Ht, _time, m_resolution);
+    updateFrequencyDomain(d_H0, d_Ht, _time*m_frequency, m_resolution);
 
     cudaThreadSynchronize();
 
     // Conduct FFT to retrive heights from frequency domain
     cufftExecC2C(m_fftPlan, d_Ht, d_Heights, CUFFT_INVERSE);
 
-    cudaThreadSynchronize();
-
     // Get the choppiness
-    addChoppiness(d_Heights, d_ChopX, d_ChopY, m_resolution, m_windDirection);
+    addChoppiness(d_Ht, d_ChopX, d_ChopZ, m_resolution, m_windDirection);
+    cufftExecC2C(m_fftPlan, d_ChopX, d_ChopX, CUFFT_INVERSE);
+    cufftExecC2C(m_fftPlan, d_ChopZ, d_ChopZ, CUFFT_INVERSE);
 
+    cudaThreadSynchronize();
 }
 //----------------------------------------------------------------------------------------------------------------------
 float2* Ocean::getHeights(){
@@ -148,10 +138,10 @@ float2* Ocean::getChopX(){
     return h_ChopX;
 }
 //----------------------------------------------------------------------------------------------------------------------
-float2* Ocean::getChopY(){
-    checkCudaErrors(cudaMemcpy(h_ChopY, d_ChopY, m_gridSize*sizeof(float2), cudaMemcpyDeviceToHost));
+float2* Ocean::getChopZ(){
+    checkCudaErrors(cudaMemcpy(h_ChopZ, d_ChopZ, m_gridSize*sizeof(float2), cudaMemcpyDeviceToHost));
 
-    return h_ChopY;
+    return h_ChopZ;
 }
 //----------------------------------------------------------------------------------------------------------------------
 void Ocean::setResolution(int _res){
@@ -168,8 +158,8 @@ void Ocean::setResolution(int _res){
     cudaFree(d_Heights);
     free(h_ChopX);
     cudaFree(d_ChopX);
-    free(h_ChopY);
-    cudaFree(d_ChopY);
+    free(h_ChopZ);
+    cudaFree(d_ChopZ);
 
     initialise();
 }
@@ -177,9 +167,10 @@ void Ocean::setResolution(int _res){
 void Ocean::setWindVector(float2 _windVector){
     m_windDirection = _windVector;
 }
-
+//----------------------------------------------------------------------------------------------------------------------
 void Ocean::setWindSpeed(float _speed){
     m_windSpeed = _speed;
     m_L = (m_windSpeed * m_windSpeed) / 9.81;
     m_l = m_L / 1000.0;
 }
+//----------------------------------------------------------------------------------------------------------------------

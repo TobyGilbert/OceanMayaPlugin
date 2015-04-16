@@ -2185,6 +2185,9 @@ obj/Plugin.o: src/Plugin.cpp include/OceanNode.h \
 		/opt/autodesk/maya2014-x64/include/maya/MAngle.h \
 		/opt/autodesk/maya2014-x64/include/maya/MTimeArray.h \
 		include/Ocean.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometry.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryData.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryPrimitive.h \
 		/opt/cuda-6.5/include/cuda_runtime.h \
 		/opt/cuda-6.5/include/host_config.h \
 		/opt/cuda-6.5/include/builtin_types.h \
@@ -2248,6 +2251,9 @@ obj/Ocean.o: src/Ocean.cpp include/Ocean.h \
 		/opt/autodesk/maya2014-x64/include/maya/MFn.h \
 		/opt/autodesk/maya2014-x64/include/maya/MSelectionMask.h \
 		/opt/autodesk/maya2014-x64/include/maya/MVectorArray.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometry.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryData.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryPrimitive.h \
 		/opt/cuda-6.5/include/cuda_runtime.h \
 		/opt/cuda-6.5/include/host_config.h \
 		/opt/cuda-6.5/include/builtin_types.h \
@@ -2573,6 +2579,9 @@ obj/OceanNode.o: src/OceanNode.cpp include/OceanNode.h \
 		/opt/autodesk/maya2014-x64/include/maya/MAngle.h \
 		/opt/autodesk/maya2014-x64/include/maya/MTimeArray.h \
 		include/Ocean.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometry.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryData.h \
+		/opt/autodesk/maya2014-x64/include/maya/MGeometryPrimitive.h \
 		/opt/cuda-6.5/include/cuda_runtime.h \
 		/opt/cuda-6.5/include/host_config.h \
 		/opt/cuda-6.5/include/builtin_types.h \

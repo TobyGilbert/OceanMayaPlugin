@@ -84,7 +84,7 @@ linux-g++*:MAYALOCATION=/opt/autodesk/maya
 # under linux we need to use the version of g++ used to build maya
 # in this case g++412
 ####################################################################################
-#linux-g++-64:QMAKE_CXX = g++412
+linux-g++-64:QMAKE_CXX = g++412
 ####################################################################################
 # set the include path for linux
 ####################################################################################
@@ -167,3 +167,6 @@ cuda.dependency_type = TYPE_C
 cuda.depend_command = $$CUDA_DIR/bin/nvcc -g -G -M $$CUDA_INC $$NVCCFLAGS ${QMAKE_FILE_NAME}
 
 QMAKE_EXTRA_UNIX_COMPILERS += cuda
+
+#OTHER_FILES += \
+#    shaders/OceanShader.cgfx

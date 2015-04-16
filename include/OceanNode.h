@@ -44,106 +44,109 @@
 #undef double4
 
 #include "Ocean.h"
-
 #include <vector>
 //----------------------------------------------------------------------------------------------------------------------
-/// @brief this class implements a perlin noise node with one output, it has 3 different noise
-/// access types noise, turbulance and complex descriptions below
+/// @brief This class implements a Cuda FFT ocean node with one mesh output
 //----------------------------------------------------------------------------------------------------------------------
-
 class OceanNode : public MPxNode{
 public:
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the creator node is called when the plugin is created
+  /// @brief The creator node is called when the plugin is created
   //----------------------------------------------------------------------------------------------------------------------
   static void		*creator();
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief initialize called when plug is created
+  /// @brief Initialize called when plug is created
   //----------------------------------------------------------------------------------------------------------------------
   static MStatus		initialize();
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief compute is called every time the attributes of the class change
+  /// @brief Compute is called every time the attributes of the class change
   /// @param [in] 	_plug 	plug representing the attribute that needs to be recomputed
-  /// @param [in] 	_block 	data block containing storage for the node'_scale attributes
+  /// @param [in] 	_block data block containing storage for the node'_scale attributes
   //----------------------------------------------------------------------------------------------------------------------
   virtual MStatus		compute(const MPlug &_plug ,MDataBlock &_block);
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the id of this plugin must be public so we can set outside of class
+  /// @brief The id of this plugin must be public so we can set outside of class
   //----------------------------------------------------------------------------------------------------------------------
   static MTypeId 		m_id;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the unique type name of our custom node. Mainly for mel purposes.
+  /// @brief The unique type name of our custom node. Mainly for mel purposes.
   /// must be public so maya can access
   //----------------------------------------------------------------------------------------------------------------------
   static const MString typeName;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief ctor this will dynamically allocate a Noise class
+  /// @brief Constructor this will dynamically allocate a ocean class
   //----------------------------------------------------------------------------------------------------------------------
   OceanNode();
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief dtor this will destroy the noise class created in the ctor
+  /// @brief Destructor this will destroy the ocean class created in the constructor
   //----------------------------------------------------------------------------------------------------------------------
   ~OceanNode();
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief Create a new ocean grid to work with
+  /// @brief Creates a new MFnMesh to represent our ocean
+  /// @param _resolution the resolution of our grid
+  /// @param _time the current simulation time
+  /// @param _choppiness a scale factor for how much displacement we have in the x
+  /// and z axis
+  /// @param _outputData an object which represents the output mesh of our node
+  /// @param _status to check whether MFnMesh creation was successful
   //----------------------------------------------------------------------------------------------------------------------
   void createGrid(int _resolution, double _time, double _choppiness, MObject &_outputData, MStatus &_status);
   //----------------------------------------------------------------------------------------------------------------------
 private :
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the amplitude of our node
+  /// @brief The amplitude of our waves
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_amplitude;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the wind speed in the x direction
+  /// @brief The wind speed in the X axis
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_windDirectionX;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the wind speed in the y direction
+  /// @brief The wind speed in the Z axis
   //----------------------------------------------------------------------------------------------------------------------
-  static MObject m_windDirectionY;
+  static MObject m_windDirectionZ;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the output to our node
+  /// @brief The output to our node
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_output;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief
+  /// @brief The current time/frame No. of our simulation
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_time;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief The chopiness scale factor
+  /// @brief The choppiness scale factor
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_choppiness;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the ocean generator
+  /// @brief The ocean generator
   //----------------------------------------------------------------------------------------------------------------------
   Ocean *m_ocean;
   //----------------------------------------------------------------------------------------------------------------------
-  /// A mesh to hold our ocean grid
+  /// A mesh Holds our ocean grid mesh
   //----------------------------------------------------------------------------------------------------------------------
   MFnMesh m_grid;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief attribute for keeping track of the amplitude variable
+  /// @brief Attribute for keeping track of the amplitude variable
   //----------------------------------------------------------------------------------------------------------------------
   static double m_amp;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief attribute for keeping track of the wind dir x variable
+  /// @brief Attribute for keeping track of the wind dir x variable
   //----------------------------------------------------------------------------------------------------------------------
   static double m_wdx;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief attribute for keeping track of the wind dir y variable
+  /// @brief Attribute for keeping track of the wind dir y variable
   //----------------------------------------------------------------------------------------------------------------------
-  static double m_wdy;
+  static double m_wdz;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief attribute for keeping track of the wind speed variable
+  /// @brief Attribute for keeping track of the wind speed variable
   //----------------------------------------------------------------------------------------------------------------------
   static double m_ws;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief the grid resolution
+  /// @brief The grid resolution
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_resolution;
   //----------------------------------------------------------------------------------------------------------------------
-  /// @brief our available resolutions
+  /// @brief Our available grid resolutions
   //----------------------------------------------------------------------------------------------------------------------
   enum ResTypes{RES128,RES256,RES512, RES1024};
   //----------------------------------------------------------------------------------------------------------------------
@@ -154,6 +157,10 @@ private :
   /// @brief Our wind speed
   //----------------------------------------------------------------------------------------------------------------------
   static MObject m_windSpeed;
+  //----------------------------------------------------------------------------------------------------------------------
+  /// @brief Frequency of our waves
+  //----------------------------------------------------------------------------------------------------------------------
+  static MObject m_frequency;
   //----------------------------------------------------------------------------------------------------------------------
 };
 //----------------------------------------------------------------------------------------------------------------------

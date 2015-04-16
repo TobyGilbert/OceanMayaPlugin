@@ -1,7 +1,12 @@
+//----------------------------------------------------------------------------------------------------------------------
+/// @class OceanNode class
+/// @brief A class for generating a custom maya node for generating an ocean surface using fft and NVidia's Cuda
+/// @author Toby Gilbert
+/// @version 1.0
+/// @date 03/04/15
+//----------------------------------------------------------------------------------------------------------------------
 #include "OceanNode.h"
 #include <boost/lexical_cast.hpp>
-
-
 //----------------------------------------------------------------------------------------------------------------------
 /// @brief simple macro to check status and return if error
 /// originally written by Sola Aina
@@ -34,12 +39,13 @@ MObject OceanNode::m_resolution;
 MObject OceanNode::m_amplitude;
 MObject OceanNode::m_output;
 MObject OceanNode::m_windDirectionX;
-MObject OceanNode::m_windDirectionY;
+MObject OceanNode::m_windDirectionZ;
 MObject OceanNode::m_windSpeed;
 MObject OceanNode::m_choppiness;
 MObject OceanNode::m_time;
+MObject OceanNode::m_frequency;
 double OceanNode::m_wdx;
-double OceanNode::m_wdy;
+double OceanNode::m_wdz;
 double OceanNode::m_ws;
 double OceanNode::m_amp;
 int OceanNode::m_res;
@@ -55,10 +61,10 @@ OceanNode::~OceanNode(){
 //----------------------------------------------------------------------------------------------------------------------
 MStatus	OceanNode::initialize(){
     // Attributes to check whether the amplitude or wind vector have changed
-    m_wdx = 1.0;
-    m_wdy = 1.0;
+    m_wdx = 0.0;
+    m_wdz = 1.0;
     m_ws = 100.0;
-    m_amp = 0.03;
+    m_amp = 100.0;
     m_res = 0;
 
     MStatus status;
@@ -81,27 +87,39 @@ MStatus	OceanNode::initialize(){
     MFnNumericAttribute	numAttr;
 
     // amplitde
-    m_amplitude = numAttr.create( "amplitude", "amp", MFnNumericData::kDouble, 0.01, &status );
+    m_amplitude = numAttr.create( "amplitude", "amp", MFnNumericData::kDouble, 100.0, &status );
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status , "Unable to create \"amplitude\" attribute" );
-    numAttr.setChannelBox( true );			// length attribute appears in channel box
+    numAttr.setChannelBox( true );
     // add attribute
     status = addAttribute( m_amplitude );
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status , "Unable to add \"amplitude\" attribute to OceanNode" );
 
-    // the wind speed inputs
-    m_windDirectionX = numAttr.create( "windDirectionX", "wdx", MFnNumericData::kDouble, 0.5, &status);
-    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status, "Unable to create \"wdx\" attribute");
+    // frequency
+    m_frequency = numAttr.create("frequency", "frq", MFnNumericData::kDouble, 0.5, &status);
+    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to create \"frequency\" attribute");
     numAttr.setChannelBox(true);
+    status = addAttribute(m_frequency);
+    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"frequency\" attribute to OceanNodee");
+
+    // the wind speed inputs
+    MFnNumericAttribute	windDirectionAttr;
+    m_windDirectionX = windDirectionAttr.create( "windDirectionX", "wdx", MFnNumericData::kDouble, 0.0, &status);
+    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status, "Unable to create \"wdx\" attribute");
+    windDirectionAttr.setChannelBox(true);
+    windDirectionAttr.setMin(0.0);
+    windDirectionAttr.setMax(1.0);
     // add attribute
     status = addAttribute( m_windDirectionX );
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"wdx\" attribute to OceanNode")
 
-    m_windDirectionY = numAttr.create( "windDirectionY", "wdy", MFnNumericData::kDouble, 0.5, &status);
+    m_windDirectionZ = windDirectionAttr.create( "windDirectionZ", "wdz", MFnNumericData::kDouble, 0.5, &status);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status, "Unable to create \"wdy\" attribute");
-    numAttr.setChannelBox(true);
+    windDirectionAttr.setChannelBox(true);
+    windDirectionAttr.setMin(0.0);
+    windDirectionAttr.setMax(1.0);
     // add attribute
-    status = addAttribute( m_windDirectionY );
-    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"wdy\" attribute to OceanNode");
+    status = addAttribute( m_windDirectionZ );
+    CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"wdz\" attribute to OceanNode");
 
     m_windSpeed = numAttr.create( "windSpeed", "ws", MFnNumericData::kDouble, 100.0, &status);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status, "Unable to create \"ws\" attribute");
@@ -110,19 +128,23 @@ MStatus	OceanNode::initialize(){
     status = addAttribute( m_windSpeed );
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"ws\" attribute to OceanNode");
 
-    m_choppiness = numAttr.create("chopiness", "chp", MFnNumericData::kDouble, 0.0, &status);
+    MFnNumericAttribute	chopAttr;
+    m_choppiness = chopAttr.create("chopiness", "chp", MFnNumericData::kDouble, 0.0, &status);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to create \"chopiness\" attribute");
-    numAttr.setChannelBox(true);
+    chopAttr.setChannelBox(true);
+    chopAttr.setMax(2.0);
+    chopAttr.setMin(0.0);
     // add attribute
     status = addAttribute(m_choppiness);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"choppiness\" attribute to OceanNode");
 
     // now the time inputs
-    m_time = numAttr.create("time", "t", MFnNumericData::kDouble, 0.0, &status);
+    MFnNumericAttribute	timeAttr;
+    m_time = timeAttr.create("time", "t", MFnNumericData::kDouble, 0.0, &status);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to create \"t\" attribute");
     // Add the attribute
     status = addAttribute(m_time);
-    numAttr.setHidden(true);
+    timeAttr.setHidden(true);
     CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to add \"t\" attribute to OceanNode");
 
     // create the output attribute
@@ -138,7 +160,7 @@ MStatus	OceanNode::initialize(){
     attributeAffects(m_resolution, m_output);
     attributeAffects(m_amplitude,m_output);
     attributeAffects(m_windDirectionX, m_output);
-    attributeAffects(m_windDirectionY, m_output);
+    attributeAffects(m_windDirectionZ, m_output);
     attributeAffects(m_windSpeed, m_output);
     attributeAffects(m_choppiness, m_output);
     attributeAffects(m_time, m_output);
@@ -192,15 +214,20 @@ MStatus OceanNode::compute( const MPlug &_plug , MDataBlock &_data ){
         double amp = dataHandle.asDouble();
         m_ocean->setAmplitude(amp);
 
+        dataHandle = _data.inputValue(m_frequency, &status);
+        CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to get handle for \"frequency\" plug");
+        double freq = dataHandle.asDouble();
+        m_ocean->setFrequency(freq);
+
         dataHandle = _data.inputValue(m_windDirectionX, &status);
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to get data handle for windDirectionX plug");
         // now get value for data handle
         double wdx = dataHandle.asDouble();
-        dataHandle = _data.inputValue(m_windDirectionY, &status);
+        dataHandle = _data.inputValue(m_windDirectionZ, &status);
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to get data handle for windDirectionY plug");
         // now get value for data handle
-        double wdy = dataHandle.asDouble();
-        m_ocean->setWindVector(make_float2(wdx, wdy));
+        double wdz = dataHandle.asDouble();
+        m_ocean->setWindVector(make_float2(wdx, wdz));
 
         dataHandle = _data.inputValue(m_windSpeed, &status);
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to get data handle for windSpeed plug");
@@ -209,12 +236,12 @@ MStatus OceanNode::compute( const MPlug &_plug , MDataBlock &_data ){
         m_ocean->setWindSpeed(ws);
 
         // Only create a new frequency domain if either amplitude or the wind vecotr has changed
-        if (m_amp != amp || m_wdx != wdx || m_wdy != wdy || m_ws != ws ){
+        if (m_amp != amp || m_wdx != wdx || m_wdz != wdz || m_ws != ws ){
             MGlobal::displayInfo("here");
             m_ocean->createH0();
             m_amp = amp;
             m_wdx = wdx;
-            m_wdy = wdy;
+            m_wdz = wdz;
             m_ws = ws;
         }
 
@@ -224,6 +251,7 @@ MStatus OceanNode::compute( const MPlug &_plug , MDataBlock &_data ){
 
         dataHandle = _data.inputValue(m_time, &status);
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to get data handle for time plug");
+        MTime time = dataHandle.asTime();
 
         MDataHandle outputData = _data.outputValue(m_output, &status);
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL( status , "Unable to get data handle for output plug" );
@@ -233,13 +261,11 @@ MStatus OceanNode::compute( const MPlug &_plug , MDataBlock &_data ){
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to create output mesh");
 
         // Find the current frame number we're on and create the grid based on this
-        MTime frameNo;
         MAnimControl anim;
-        // Set min and mix frames
-        frameNo.setValue(0);
-        anim.setMinTime(frameNo);
+        anim.setMinTime(time);
 
-        createGrid((int)pow(2.0, m_res+7), anim.currentTime().value()/70.0, choppiness, outputObject, status);
+        createGrid((int)pow(2.0, m_res+7), anim.currentTime().value()/24, choppiness, outputObject, status);
+
         CHECK_STATUS_AND_RETURN_MSTATUS_IF_FAIL(status, "Unable to to create grid");
 
         outputData.set(outputObject);
@@ -289,19 +315,19 @@ void OceanNode::createGrid(int _resolution, double _time, double _choppiness, MO
 
     float2* heights = m_ocean->getHeights();
     float2* chopXArray = m_ocean->getChopX();
-    float2* chopYArray = m_ocean->getChopY();
+    float2* chopZArray = m_ocean->getChopZ();
 
     // Sourced form Jon Macey's NGL library
     for(int z=0; z<_resolution; z++){
         for(int x=0; x<_resolution; x++){
             float height = heights[z * _resolution + x].x/50000.0;
-            float chopX = _choppiness * chopXArray[z * _resolution + x].x;
-            float chopY = _choppiness * chopYArray[z * _resolution + x].x;
+            float chopX = _choppiness * chopXArray[z * _resolution + x].x/50000.0;
+            float chopZ = _choppiness * chopZArray[z * _resolution + x].x/50000.0;
             int sign = 1.0;
             if ((x+z) % 2 != 0){
                 sign = -1.0;
             }
-            vertices.append((xPos + (chopX * sign)), height * sign, (zPos + (chopY * sign)));
+            vertices.append((xPos + (chopX * sign)), height * sign, (zPos + (chopZ * sign)));
             // calculate the new position
             xPos+=wStep;
         }
