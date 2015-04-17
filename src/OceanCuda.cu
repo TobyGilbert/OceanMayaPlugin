@@ -71,10 +71,6 @@ __global__ void frequencyDomain(float2* d_h0Pointer, float2* d_htPointer, float 
 /// @param _windSpeed the velocity of the wind
 // ----------------------------------------------------------------------------------------------------------------------------------------
 __global__ void choppiness(float2* d_Ht, float2* d_ChopX, float2* d_ChopZ, int _res, float2 _windSpeed){
-    // A vertex on the grid
-    int u = int(threadIdx.x - (_res * floor(double(threadIdx.x / _res))));
-    int v = int((blockIdx.x * (blockDim.x/(float)_res)) + ceil(double(threadIdx.x / _res)));
-
     float2 k;
     k.x = _windSpeed.x;
     k.y = _windSpeed.y;
@@ -89,10 +85,10 @@ __global__ void choppiness(float2* d_Ht, float2* d_ChopX, float2* d_ChopZ, int _
         Kz = 0.0;
     }
 
-    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].x * 0.0;
+    d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].x = 0.0;
     d_ChopX[(blockIdx.x * blockDim.x) + threadIdx.x].y = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].y * -Kx;
 
-    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].x * 0.0;
+    d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].x = 0.0;
     d_ChopZ[(blockIdx.x * blockDim.x) + threadIdx.x].y = d_Ht[(blockIdx.x * blockDim.x) + threadIdx.x].y * -Kz;
 }
 // ----------------------------------------------------------------------------------------------------------------------------------------

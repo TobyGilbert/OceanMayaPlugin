@@ -42,7 +42,7 @@ float Ocean::phillips(float2 _k){
 
     // Waves moving in the opposite direction to the wind get dampened
     if (((_k.x * m_windDirection.x) + (_k.y * m_windDirection.y))  < 0.0){
-        ph *= 0.05;
+        ph *= 0.00;
     }
     // exp(-k^2 l^2)
     ph *= exp(-(kLen * kLen) * m_l * m_l);
@@ -69,11 +69,11 @@ void Ocean::createH0(){
     // Assign memory on the host side and device to store h0 and evaluate
     for (int x=0; x<m_resolution; x++){
         for (int y=0; y<m_resolution; y++){
-            int m = x - (m_resolution/2.0);
-            int n = y - (m_resolution/2.0);
+            int m = x - (m_resolution/2);
+            int n = y - (m_resolution/2);
             float2 k;
-            k.x = (2*M_PI * m) / 1000.0;
-            k.y = (2*M_PI * n) / 1000.0;
+            k.x = (2*M_PI * m) / 1000.0f;
+            k.y = (2*M_PI * n) / 1000.0f;
 
             float2 h;
             h.x = (1.0/sqrt(2.0)) * gauss() * sqrt(phillips(k));

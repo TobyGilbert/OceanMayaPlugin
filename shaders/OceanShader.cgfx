@@ -85,7 +85,7 @@ fragData vert(vertData IN){
 	OUT.HPosition = mul(ModelViewProjectionMatrix, position);
 	OUT.Colour = mul(NormalMatrix, float4(IN.Normal + float3(0.5), 1.0));
 	OUT.Pos = mul(ModelViewMatrix, float4(position.xyz, 1.0));
-	OUT.ViewVector = normalize(OUT.Pos - cameraPosition);
+	OUT.ViewVector = normalize(cameraPosition - OUT.Pos);
 	OUT.Normal = normalize(mul(NormalMatrix, float4(IN.Normal, 1.0))).xyz;	
 
 	return OUT;
@@ -111,13 +111,10 @@ float3 sunStreak(float3 _normal, float4 _position){
 float4 frag(fragData IN) : COLOR
 {
 	float3 Normal = normalize(IN.Normal);
-	//float3 seaBaseColour = float3(0.1, 0.19, 0.22);
-	//float3 seaTopColour = float3(0.8, 0.9, 0.6);
 
 	// Calculate the reflected colour
 	float4 reflectionVector = normalize(reflect(IN.ViewVector, float4(Normal,1.0)));
 	float3 reflectionColour = texCUBE(Environment,reflectionVector).xyz;
-	//float3 reflectionColour = float3(1.0, 1.0, 1.0);
 	
 	// The refraction colour
 	float3 refractionColour = seaBaseColour + float3(diffuse(IN.Pos, Normal)) * seaTopColour * 0.12;

@@ -288,8 +288,6 @@ void* OceanNode::creator(){
     return new OceanNode();
 }
 //----------------------------------------------------------------------------------------------------------------------
-
-
 void OceanNode::createGrid(int _resolution, double _time, double _choppiness, MObject& _outputData, MStatus &_status){
     int numTris = (_resolution-1)*(_resolution-1)*2;
 
@@ -320,21 +318,22 @@ void OceanNode::createGrid(int _resolution, double _time, double _choppiness, MO
     // Sourced form Jon Macey's NGL library
     for(int z=0; z<_resolution; z++){
         for(int x=0; x<_resolution; x++){
+            // Divide the values we get out of the FFT by 50000 to get them in a suitable range
             float height = heights[z * _resolution + x].x/50000.0;
             float chopX = _choppiness * chopXArray[z * _resolution + x].x/50000.0;
-            float chopZ = _choppiness * chopZArray[z * _resolution + x].x/50000.0;
+            float chopZ= _choppiness * chopZArray[z * _resolution + x].x/50000.0;
             int sign = 1.0;
             if ((x+z) % 2 != 0){
                 sign = -1.0;
             }
             vertices.append((xPos + (chopX * sign)), height * sign, (zPos + (chopZ * sign)));
             // calculate the new position
-            xPos+=wStep;
+            zPos+=dStep;
         }
         // now increment to next z row
-        zPos+=dStep;
+        xPos+=wStep;
         // we need to re-set the xpos for new row
-        xPos=-((float)width/2.0);
+        zPos=-((float)depth/2.0);
     }
 
     // Array for num vertices in each face
@@ -363,3 +362,4 @@ void OceanNode::createGrid(int _resolution, double _time, double _choppiness, MO
 
     m_grid.create(vertices.length(), numTris, vertices, numFaceVertices, faceVertices, _outputData, &_status);
 }
+//----------------------------------------------------------------------------------------------------------------------
