@@ -360,6 +360,7 @@ void OceanNode::createGrid(int _resolution, double _time, double _choppiness, MO
         faceVertices.append(tris[i]);
     }
 
-    m_grid.create(vertices.length(), numTris, vertices, numFaceVertices, faceVertices, _outputData, &_status);
+   MFnMesh grid;
+   grid.create(vertices.length(), numTris, vertices, numFaceVertices, faceVertices, _outputData, &_status);
 }
 //----------------------------------------------------------------------------------------------------------------------
