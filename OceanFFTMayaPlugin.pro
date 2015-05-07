@@ -108,7 +108,7 @@ linux*:QMAKE_CXX += -fPIC
 # tell maya we're building for Mac
 ####################################################################################
 macx:DEFINES+=OSMac_
-macx:MAYALOCATION=/Applications/Autodesk/maya2014
+macx:MAYALOCATION=/Applications/Autodesk/maya2015
 macx:CONFIG -= app_bundle
 macx:INCLUDEPATH+=$$MAYALOCATION/devkit/include
 ####################################################################################
@@ -121,8 +121,8 @@ macx:CUDA_DIR = /Developer/NVIDIA/CUDA-6.5
 linux:CUDA_DIR = /opt/cuda-6.5
 
 macx:LIBS +=-bundle
-macx:LIBS += -L$$CUDA_DIR/lib -lcuda -lcudart -lcufft
-linux:LIBS += -L$$CUDA_DIR/lib64 -lcuda -lcudart -lcufft
+macx:LIBS += -L$$CUDA_DIR/lib -lcudart -lcufft
+linux:LIBS += -L$$CUDA_DIR/lib64 -lcudart -lcufft
 
 macx:LIBS -=-dynamiclib
 ####################################################################################
@@ -161,7 +161,7 @@ CUDA_INC = $$join(INCLUDEPATH,' -I','-I',' ')
 cuda.input = CUDA_SOURCES
 cuda.output = ${OBJECTS_DIR}${QMAKE_FILE_BASE}_cuda.o
 
-cuda.commands = $$CUDA_DIR/bin/nvcc -m64 -g -G -gencode arch=compute_20,code=sm_20 -c $$NVCCFLAGS $$CUDA_INC $$CUDA_LIBS  ${QMAKE_FILE_NAME} -o ${QMAKE_FILE_OUT}
+cuda.commands = $$CUDA_DIR/bin/nvcc -m64 -g -G -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -c $$NVCCFLAGS $$CUDA_INC $$CUDA_LIBS  ${QMAKE_FILE_NAME} -o ${QMAKE_FILE_OUT}
 
 cuda.dependency_type = TYPE_C
 cuda.depend_command = $$CUDA_DIR/bin/nvcc -g -G -M $$CUDA_INC $$NVCCFLAGS ${QMAKE_FILE_NAME}
