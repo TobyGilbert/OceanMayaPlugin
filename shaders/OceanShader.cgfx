@@ -13,6 +13,11 @@ float4 sunPosition : Position
 	string Space = "World";
 > = { 0.0, 20.0, -500.0, 1.0};
 
+float3 sunColour : Ambient 
+<
+	string UIHelp = "Sun Colour";
+> = { 1.0f, 1.0f, 1.0f };
+
 float3 seaBaseColour : Ambient
 <
 	string UIHelp = "Sea Base Colour";
@@ -69,7 +74,6 @@ struct vertData {
 // vertex->fragment registers used for this pass only
 struct fragData {
     float4 HPosition 	: POSITION;
-	float4 Colour 		: COLOR0;
 	float4 ViewVector	: TEXCOORD0;
 	float3 Normal 		: TEXCOORD1;
 	float4 Pos 			: TEXCOORD2;
@@ -78,12 +82,12 @@ struct fragData {
 /****************************************/
 /****************************************/
 
+
 fragData vert(vertData IN){
 	fragData OUT;
 	float4 position = float4(IN.Position.xyz,1.0);
 	
 	OUT.HPosition = mul(ModelViewProjectionMatrix, position);
-	OUT.Colour = mul(NormalMatrix, float4(IN.Normal + float3(0.5), 1.0));
 	OUT.Pos = mul(ModelViewMatrix, float4(position.xyz, 1.0));
 	OUT.ViewVector = normalize(cameraPosition - OUT.Pos);
 	OUT.Normal = normalize(mul(NormalMatrix, float4(IN.Normal, 1.0))).xyz;	
@@ -105,7 +109,8 @@ float diffuse(float4 _pos, float3 _normal){
 // Sun streak referenced from https://www.shadertoy.com/view/4dl3zr
 float3 sunStreak(float3 _normal, float4 _position){
 	float3 r = normalize(reflect(-sunPosition.xyz, _normal));
-	return float3(1.0 * pow(max(0.0, dot(r.xyz, normalize(-_position.xyz))), 200.0));
+	return float3(1.0 * pow(max(0.0, dot(r.xyz, normalize(-_position.xyz))), 200.0)) * sunColour;
+	return float3(1.0 * pow(max(0.0, dot(r.xyz, normalize(-_position.xyz))), 200.0)) * sunColour;
 }
 
 float4 frag(fragData IN) : COLOR
@@ -125,7 +130,7 @@ float4 frag(fragData IN) : COLOR
 	float attenuation = max(1.0 - dot(dist, dist) * 0.001, 0.0);
 	colour += seaTopColour * (IN.Pos.z - 0.6) * 0.18 * attenuation;
 	colour += sunStreak(Normal, IN.Pos);
-
+	
 	return float4(colour, 1.0);
 }
 

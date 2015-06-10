@@ -46,7 +46,7 @@ __global__ void frequencyDomain(float2* d_h0Pointer, float2* d_htPointer, float 
     // Swap the imaginary parts sign
     h0conjugate.y = -h0conjugate.y;
 
-    // Equation 26 of Tessendorf's paper h(k,t) = h0(k)exp{iw(k)t} + ~h0(-k)exp{-iw(k)t}
+    // Equation 26 of Tessendorf's paper ~h(k,t) = h0(k)exp{iw(k)t} + *h0(-k)exp{-iw(k)t}
     float2 h;
     h.x = (h0.x * complexExp.x - h0.y * complexExp.y);
     h.y = (h0.x * complexExp.x + h0.y * complexExp.y);
